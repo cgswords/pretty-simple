@@ -1,0 +1,5 @@
+---
+source: src/tests/exp.rs
+expression: "render(expr_doc_pretty(&id), 30)"
+---
+\x. x

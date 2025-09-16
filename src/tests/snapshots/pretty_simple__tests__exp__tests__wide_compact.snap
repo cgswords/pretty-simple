@@ -1,0 +1,5 @@
+---
+source: src/tests/exp.rs
+expression: "render(expr_doc_compact(&e), 120)"
+---
+let value = veryLongIdentifierThatForcesWrap arg1 in veryLongIdentifierThatForcesWrap arg2 arg3

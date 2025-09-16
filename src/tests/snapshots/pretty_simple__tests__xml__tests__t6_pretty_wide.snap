@@ -1,0 +1,9 @@
+---
+source: src/tests/xml.rs
+expression: "render(xml_doc_pretty(&xml), 30)"
+---
+<ul>
+    <li>one</li>
+    <li>two</li>
+    <li>three</li>
+</ul>

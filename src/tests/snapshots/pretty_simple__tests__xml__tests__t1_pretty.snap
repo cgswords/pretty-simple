@@ -1,0 +1,5 @@
+---
+source: src/tests/xml.rs
+expression: "render(xml_doc_pretty(&xml), 20)"
+---
+<p>Hello</p>

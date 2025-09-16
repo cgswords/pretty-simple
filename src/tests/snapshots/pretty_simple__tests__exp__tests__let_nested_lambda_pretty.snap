@@ -1,0 +1,6 @@
+---
+source: src/tests/exp.rs
+expression: "render(expr_doc_pretty(&e), 12)"
+---
+let id = \x. x
+in id y

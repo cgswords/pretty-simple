@@ -1,0 +1,5 @@
+---
+source: src/tests/xml.rs
+expression: "render(xml_doc_compact(&xml), 120)"
+---
+<msg title="He said &quot;hi&quot; &amp; left &lt;quickly&gt;">5 &lt; 7 &amp; 9 &gt; 3</msg>

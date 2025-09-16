@@ -1,0 +1,5 @@
+---
+source: src/tests/xml.rs
+expression: "render(xml_doc_compact(&xml), 120)"
+---
+<a href="/docs"><b>click</b></a>
