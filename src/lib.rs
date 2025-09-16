@@ -18,6 +18,10 @@ pub trait ToDoc {
     }
 }
 
+// -------------------------------------------------------------------------------------------------
+// Helpers
+// -------------------------------------------------------------------------------------------------
+
 /// Convert an iterator of items to a `Doc` by rendering each item with `ToDoc` and
 /// interspersing `separator` between them.
 ///
