@@ -169,7 +169,6 @@ fn escape_attr(s: &str) -> String {
 // Tests
 // -------------------------------------------------------------------------------------------------
 
-#[cfg(test)]
 mod tests {
     use super::*;
     use insta::assert_snapshot;

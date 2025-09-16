@@ -135,7 +135,6 @@ pub fn expr_doc_compact(e: &Exp) -> Doc {
 // Tests
 // -------------------------------------------------------------------------------------------------
 
-#[cfg(test)]
 mod tests {
     use super::*;
     use insta::assert_snapshot;
