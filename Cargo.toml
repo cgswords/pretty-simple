@@ -1,7 +1,13 @@
 [package]
-name = "pretty_simple"
-version = "0.1.0"
+authors = ["Cameron Swords"]
+description = "RC-based, simple pretty printing library"
 edition = "2021"
+name = "pretty_simple"
+readme = "README.md"
+repository = "https://github.com/cgswords/pretty-simple"
+version = "0.1.0"
+license = "Apache-2.0"
+license-file = "LICENSE"
 
 [dependencies]
 once_cell = "1.21.3"
