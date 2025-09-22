@@ -84,30 +84,32 @@ pub fn xml_doc_pretty(x: &XML) -> Doc {
                 .concat(Doc::rangle());
 
             if body.iter().any(|entry| matches!(entry, XML::Text(_))) {
-                return open.concat(Doc::hsep(body.iter().map(xml_doc_pretty))).concat(close);
+                return open
+                    .concat(Doc::hsep(body.iter().map(xml_doc_pretty)))
+                    .concat(close);
             }
 
             // Soft separator between children: space when flat, newline when broken
             let kids_soft = Doc::sep(body.iter().map(xml_doc_pretty));
 
             // Inline: no leading/trailing softlines → no stray spaces
-            let inline =
-                open.clone()
-                    .concat(kids_soft.clone().flatten()) // children separated by spaces
-                    .concat(close.clone());
+            let inline = open
+                .clone()
+                .concat(kids_soft.clone().flatten()) // children separated by spaces
+                .concat(close.clone());
 
             // Block: one child per line, indented. No .group() on the kids.
-            let kids_vertical = body.iter()
+            let kids_vertical = body
+                .iter()
                 .map(xml_doc_pretty)
                 .reduce(|a, b| a.concat(Doc::line()).concat(b))
                 .unwrap_or_else(Doc::nil);
 
-            let block =
-                open
-                    .concat(Doc::line())
-                    .concat(kids_vertical.indent(4))
-                    .concat(Doc::line())
-                    .concat(close);
+            let block = open
+                .concat(Doc::line())
+                .concat(kids_vertical.indent(4))
+                .concat(Doc::line())
+                .concat(close);
 
             // Choose: first if it fits, otherwise the vertical one.
             Doc::alt(inline, block)

@@ -4,6 +4,6 @@
 #[cfg(test)]
 mod exp;
 #[cfg(test)]
-mod xml;
-#[cfg(test)]
 mod unit_tests;
+#[cfg(test)]
+mod xml;

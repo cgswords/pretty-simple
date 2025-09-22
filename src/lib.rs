@@ -98,6 +98,7 @@ impl Clone for Doc {
 thread_local! {
     static NIL_INNER: Lazy<Rc<DocInner>> = Lazy::new(|| Rc::new(DocInner::Empty));
     static SPACE_INNER: Lazy<Rc<DocInner>> = Lazy::new(|| Rc::new(DocInner::Text(" ".to_string())));
+    static COMMA_INNER: Lazy<Rc<DocInner>> = Lazy::new(|| Rc::new(DocInner::Text(",".to_string())));
     static LINE_INNER: Lazy<Rc<DocInner>> = Lazy::new(|| Rc::new(DocInner::Line));
     static SOFTLINE_INNER: Lazy<Rc<DocInner>> = Lazy::new(|| Rc::new(DocInner::Alt(Doc::space(), Doc::line())));
     static SOFTLINE_EMPTY_INNER: Lazy<Rc<DocInner>> = Lazy::new(|| Rc::new(DocInner::Alt(Doc::nil(), Doc::line())));
@@ -126,6 +127,11 @@ impl Doc {
     /// A single ASCII space as a document (`" "`).
     pub fn space() -> Doc {
         SPACE_INNER.with(|lazy| Doc(Rc::clone(&*lazy)))
+    }
+
+    /// A single ASCII comma as a document (`","`).
+    pub fn comma() -> Doc {
+        COMMA_INNER.with(|lazy| Doc(Rc::clone(&*lazy)))
     }
 
     /// A hard line break.
@@ -193,7 +199,7 @@ impl Doc {
     pub fn group(self) -> Doc {
         match &*self.0 {
             DocInner::Alt(_, _) => self,
-            _ => DocInner::Alt(self.clone().flatten(), self).to_doc()
+            _ => DocInner::Alt(self.clone().flatten(), self).to_doc(),
         }
     }
 
@@ -494,10 +500,15 @@ impl Doc {
     /// alternative fits within the remaining width; hard breaks always break.
     /// The algorithm is a variant of Wadler/Leijen pretty‑printing.
     pub fn render(self, width: i16) -> String {
-        self.best(width, 0).render().unwrap()
+        let rendered = self.best(width);
+        let output = rendered.render();
+        // std::mem::forget(rendered);
+        output.unwrap()
     }
 
-    fn best(self, width: i16, cursor: i16) -> Box<Render> {
+    fn best(self, width: i16) -> Render {
+        use DocInner as DI;
+
         enum Cons {
             Cell { head: (i16, Doc), tail: Rc<Cons> },
             Nil,
@@ -507,56 +518,95 @@ impl Doc {
             Rc::new(Cons::Cell { head, tail })
         }
 
-        fn best_rec(width: i16, cursor: i16, docs: Rc<Cons>) -> Box<Render> {
-            let render = match &*docs {
-                Cons::Nil => Render::Empty,
-                Cons::Cell { head, tail } => {
-                    let (i, doc) = head;
-                    match &*doc.0 {
-                        DocInner::Empty => *best_rec(width, cursor, tail.clone()),
-                        DocInner::Text(s) => {
-                            let rec = best_rec(width, cursor + s.len() as i16, tail.clone());
-                            Render::Text(s.to_string(), rec)
-                        }
-                        DocInner::Line => {
-                            let rec = best_rec(width, *i, tail.clone());
-                            Render::Line(*i, rec)
-                        }
-                        DocInner::Concat(x, y) => *best_rec(
-                            width,
-                            cursor,
-                            cons((*i, x.clone()), cons((*i, y.clone()), tail.clone())),
-                        ),
-                        DocInner::Nest(j, inner) => {
-                            *best_rec(width, cursor, cons((i + j, inner.clone()), tail.clone()))
-                        }
-                        DocInner::Alt(flat, doc) => {
-                            let flat_rec =
-                                best_rec(width, cursor, cons((*i, flat.clone()), tail.clone()));
-                            if flat_rec.fits(width - cursor) {
-                                *flat_rec
-                            } else {
-                                *best_rec(width, cursor, cons((*i, doc.clone()), tail.clone()))
-                            }
-                        }
-                        DocInner::Column(f) => {
-                            *best_rec(width, cursor, cons((*i, f(cursor)), tail.clone()))
-                        }
-                        DocInner::Nesting(f) => {
-                            *best_rec(width, cursor, cons((*i, f(*i)), tail.clone()))
-                        }
+        // A non-allocating, non-recursive "does it fit?" that peeks ahead.
+        // Returns false if we'd exceed `remaining` or hit a hard Line.
+        fn fits(mut remaining: i16, mut cursor: i16, mut docs: Rc<Cons>) -> bool {
+            while let Cons::Cell {
+                head: (i, doc),
+                tail,
+            } = &*docs
+            {
+                match &*doc.0 {
+                    DI::Line => return true,
+                    DI::Empty => {
+                        docs = tail.clone();
+                    }
+                    DI::Text(s) => {
+                        let s_len = s.len() as i16;
+                        if s_len > remaining {
+                            return false;
+                        };
+                        remaining -= s_len;
+                        cursor += s_len;
+                        docs = tail.clone();
+                    }
+                    DI::Concat(x, y) => {
+                        docs = cons((*i, x.clone()), cons((*i, y.clone()), tail.clone()));
+                    }
+                    DI::Nest(j, inner) => {
+                        docs = cons((i + j, inner.clone()), tail.clone());
+                    }
+                    DI::Alt(flat, _doc2) => {
+                        docs = cons((*i, flat.clone()), tail.clone());
+                    }
+                    DI::Column(f) => {
+                        docs = cons((*i, f(cursor)), tail.clone());
+                    }
+                    DI::Nesting(f) => {
+                        docs = cons((*i, f(*i)), tail.clone());
                     }
                 }
-            };
-            Box::new(render)
+            }
+            true
         }
 
-        let cell = Cons::Cell {
-            head: (0, self),
-            tail: Rc::new(Cons::Nil),
-        };
+        let mut docs = cons((0, self), Rc::new(Cons::Nil));
+        let mut cursor = 0i16;
+        let mut out: Vec<RenderPart> = vec![];
 
-        best_rec(width, cursor, Rc::new(cell))
+        while let Cons::Cell { head, tail } = &*docs {
+            let (indent, doc) = head;
+            match &*doc.0 {
+                DI::Empty => {
+                    docs = tail.clone();
+                }
+                DI::Text(s) => {
+                    out.push(RenderPart::Text(s.to_string()));
+                    cursor = cursor + s.len() as i16;
+                    docs = tail.clone();
+                }
+                DI::Concat(x, y) => {
+                    docs = cons(
+                        (*indent, x.clone()),
+                        cons((*indent, y.clone()), tail.clone()),
+                    );
+                }
+                DI::Nest(j, inner) => {
+                    docs = cons((indent + j, inner.clone()), tail.clone());
+                }
+                DI::Line => {
+                    out.push(RenderPart::Line(*indent));
+                    cursor = *indent;
+                    docs = tail.clone();
+                }
+                DI::Alt(flat, alt) => {
+                    let flat = cons((*indent, flat.clone()), tail.clone());
+                    if fits(width, cursor, flat.clone()) {
+                        docs = flat;
+                    } else {
+                        docs = cons((*indent, alt.clone()), tail.clone());
+                    }
+                }
+                DI::Column(f) => {
+                    docs = cons((*indent, f(cursor)), tail.clone());
+                }
+                DI::Nesting(f) => {
+                    docs = cons((*indent, f(*indent)), tail.clone());
+                }
+            }
+        }
+
+        Render(out)
     }
 }
 
@@ -564,44 +614,31 @@ impl Doc {
 // Rendering
 // -------------------------------------------------------------------------------------------------
 
-#[derive(PartialEq, Eq)]
-enum Render {
-    Empty,
-    Line(i16, Box<Render>),
-    Text(String, Box<Render>),
+enum RenderPart {
+    Line(i16),
+    Text(String),
 }
+
+struct Render(Vec<RenderPart>);
 
 impl Render {
     fn render(&self) -> Result<String, std::fmt::Error> {
         use std::fmt::Write;
-        let mut render = self;
+        let renders = &self.0;
         let mut output = String::new();
-
-        while render != &Render::Empty {
+        for render in renders.iter() {
             match render {
-                Render::Line(i, next) => {
+                RenderPart::Line(i) => {
                     write!(&mut output, "\n")?;
                     for _n in 0..*i {
                         write!(&mut output, " ")?;
                     }
-                    render = next;
                 }
-                Render::Text(s, next) => {
+                RenderPart::Text(s) => {
                     write!(&mut output, "{}", s)?;
-                    render = next;
                 }
-                Render::Empty => unreachable!(),
             }
         }
         Ok(output)
-    }
-
-    fn fits(&self, width: i16) -> bool {
-        match self {
-            _ if width < 0 => false,
-            Render::Empty => true,
-            Render::Line(_, _) => true,
-            Render::Text(s, rest) => rest.fits(width - s.len() as i16),
-        }
     }
 }
