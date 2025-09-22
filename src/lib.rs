@@ -12,6 +12,7 @@ mod tests;
 // -------------------------------------------------------------------------------------------------
 
 pub trait ToDoc {
+    /// Convert the type into a `Doc`.
     fn to_doc(&self) -> Doc;
     fn render(&self, width: i16) -> String {
         self.to_doc().render(width)
@@ -51,7 +52,7 @@ where
     let mut iter = docs.into_iter();
     if let Some(first) = iter.next() {
         let mut output = first.to_doc();
-        while let Some(next) = iter.next() {
+        for next in iter {
             output = output.concat(separator.clone()).concat(next.to_doc());
         }
         output
@@ -81,7 +82,7 @@ enum DocInner {
 
 // This is a bit of an absue of notation, but it will make our lives a touch simpler.
 impl DocInner {
-    fn to_doc(self) -> Doc {
+    fn into_doc(self) -> Doc {
         Doc(Rc::new(self))
     }
 }
@@ -121,17 +122,17 @@ impl Doc {
     ///
     /// Renders to nothing and acts as the identity element for [`Doc::concat`].
     pub fn nil() -> Doc {
-        NIL_INNER.with(|lazy| Doc(Rc::clone(&*lazy)))
+        NIL_INNER.with(|lazy| Doc(Rc::clone(lazy)))
     }
 
     /// A single ASCII space as a document (`" "`).
     pub fn space() -> Doc {
-        SPACE_INNER.with(|lazy| Doc(Rc::clone(&*lazy)))
+        SPACE_INNER.with(|lazy| Doc(Rc::clone(lazy)))
     }
 
     /// A single ASCII comma as a document (`","`).
     pub fn comma() -> Doc {
-        COMMA_INNER.with(|lazy| Doc(Rc::clone(&*lazy)))
+        COMMA_INNER.with(|lazy| Doc(Rc::clone(lazy)))
     }
 
     /// A hard line break.
@@ -139,7 +140,7 @@ impl Doc {
     /// When rendered, this always breaks the line and sets the cursor to the current
     /// indentation level tracked by nesting/indentation combinators.
     pub fn line() -> Doc {
-        LINE_INNER.with(|lazy| Doc(Rc::clone(&*lazy)))
+        LINE_INNER.with(|lazy| Doc(Rc::clone(lazy)))
     }
 
     /// A soft line break that becomes a space if the layout fits the given width,
@@ -147,7 +148,7 @@ impl Doc {
     ///
     /// This is equivalent to `Alt(space, line)` in Wadler/Leijen pretty‑printing.
     pub fn softline() -> Doc {
-        SOFTLINE_INNER.with(|lazy| Doc(Rc::clone(&*lazy)))
+        SOFTLINE_INNER.with(|lazy| Doc(Rc::clone(lazy)))
     }
 
     /// A soft line break that becomes empty if the layout fits, or a newline
@@ -155,7 +156,7 @@ impl Doc {
     ///
     /// Useful for optional separators (e.g., trailing commas off).
     pub fn softline_empty() -> Doc {
-        SOFTLINE_EMPTY_INNER.with(|lazy| Doc(Rc::clone(&*lazy)))
+        SOFTLINE_EMPTY_INNER.with(|lazy| Doc(Rc::clone(lazy)))
     }
 
     /// Construct a document from raw text.
@@ -164,18 +165,18 @@ impl Doc {
     /// they are present in the string itself (which generally should be avoided
     /// in pretty‑printing docs).
     pub fn text<S: Into<String>>(str: S) -> Doc {
-        DocInner::Text(str.into()).to_doc()
+        DocInner::Text(str.into()).into_doc()
     }
 
     /// Concatenate two documents without inserting any separator.
     pub fn concat(self, other: Doc) -> Doc {
-        DocInner::Concat(self, other).to_doc()
+        DocInner::Concat(self, other).into_doc()
     }
 
     /// Increase the nesting (indentation) level for all lines that follow a newline
     /// within the given document by `depth` columns.
     pub fn nest(self, depth: i16) -> Doc {
-        DocInner::Nest(depth, self).to_doc()
+        DocInner::Nest(depth, self).into_doc()
     }
 
     // `<+>` from Haskell
@@ -188,7 +189,7 @@ impl Doc {
     /// Creates an `alt` set, preferring the first one if it fits and devolving to the second if it
     /// does not.
     pub fn alt(self, other: Doc) -> Doc {
-        DocInner::Alt(self, other).to_doc()
+        DocInner::Alt(self, other).into_doc()
     }
 
     /// Try to render `self` on a single line by first flattening all soft breaks;
@@ -199,7 +200,7 @@ impl Doc {
     pub fn group(self) -> Doc {
         match &*self.0 {
             DocInner::Alt(_, _) => self,
-            _ => DocInner::Alt(self.clone().flatten(), self).to_doc(),
+            _ => DocInner::Alt(self.clone().flatten(), self).into_doc(),
         }
     }
 
@@ -208,7 +209,7 @@ impl Doc {
             DocInner::Empty | DocInner::Text(_) => self,
             DocInner::Line => Doc::space(),
             DocInner::Concat(x, y) => {
-                DocInner::Concat(x.clone().flatten(), y.clone().flatten()).to_doc()
+                DocInner::Concat(x.clone().flatten(), y.clone().flatten()).into_doc()
             }
             DocInner::Nest(_, inner) => inner.clone().flatten(),
             DocInner::Alt(flat, _) => flat.clone().flatten(),
@@ -237,7 +238,7 @@ impl Doc {
         F: Fn(i16) -> Doc + 'static,
     {
         let f: DocFn = Rc::new(f);
-        DocInner::Column(f).to_doc()
+        DocInner::Column(f).into_doc()
     }
 
     /// Create a document whose contents are computed from the **current nesting level**.
@@ -252,7 +253,7 @@ impl Doc {
         F: Fn(i16) -> Doc + 'static,
     {
         let f: DocFn = Rc::new(f);
-        DocInner::Nesting(f).to_doc()
+        DocInner::Nesting(f).into_doc()
     }
 
     // -------------------------------------------
@@ -271,7 +272,7 @@ impl Doc {
         let mut iter = docs.into_iter();
         if let Some(first) = iter.next() {
             let mut output = first;
-            while let Some(next) = iter.next() {
+            for next in iter {
                 output = concat_f(output, next);
             }
             output
@@ -354,7 +355,7 @@ impl Doc {
         let mut iter = docs.into_iter();
         if let Some(first) = iter.next() {
             let mut output = first;
-            while let Some(next) = iter.next() {
+            for next in iter {
                 output = output.concat(separator.clone()).concat(next);
             }
             output
@@ -452,42 +453,42 @@ impl Doc {
 
     /// The `<` document.
     pub fn lparen() -> Doc {
-        LPAREN_INNER.with(|lazy| Doc(Rc::clone(&*lazy)))
+        LPAREN_INNER.with(|lazy| Doc(Rc::clone(lazy)))
     }
 
     /// The `>` document.
     pub fn rparen() -> Doc {
-        RPAREN_INNER.with(|lazy| Doc(Rc::clone(&*lazy)))
+        RPAREN_INNER.with(|lazy| Doc(Rc::clone(lazy)))
     }
 
     /// The `<` document.
     pub fn langle() -> Doc {
-        LANGLE_INNER.with(|lazy| Doc(Rc::clone(&*lazy)))
+        LANGLE_INNER.with(|lazy| Doc(Rc::clone(lazy)))
     }
 
     /// The `>` document.
     pub fn rangle() -> Doc {
-        RANGLE_INNER.with(|lazy| Doc(Rc::clone(&*lazy)))
+        RANGLE_INNER.with(|lazy| Doc(Rc::clone(lazy)))
     }
 
     /// The `[` document.
     pub fn lbracket() -> Doc {
-        LBRACKET_INNER.with(|lazy| Doc(Rc::clone(&*lazy)))
+        LBRACKET_INNER.with(|lazy| Doc(Rc::clone(lazy)))
     }
 
     /// The `]` document.
     pub fn rbracket() -> Doc {
-        RBRACKET_INNER.with(|lazy| Doc(Rc::clone(&*lazy)))
+        RBRACKET_INNER.with(|lazy| Doc(Rc::clone(lazy)))
     }
 
     /// The `{` document.
     pub fn lbrace() -> Doc {
-        LBRACE_INNER.with(|lazy| Doc(Rc::clone(&*lazy)))
+        LBRACE_INNER.with(|lazy| Doc(Rc::clone(lazy)))
     }
 
     /// The `}` document.
     pub fn rbrace() -> Doc {
-        RBRACE_INNER.with(|lazy| Doc(Rc::clone(&*lazy)))
+        RBRACE_INNER.with(|lazy| Doc(Rc::clone(lazy)))
     }
 
     // -------------------------------------------
@@ -572,7 +573,7 @@ impl Doc {
                 }
                 DI::Text(s) => {
                     out.push(RenderPart::Text(s.to_string()));
-                    cursor = cursor + s.len() as i16;
+                    cursor += s.len() as i16;
                     docs = tail.clone();
                 }
                 DI::Concat(x, y) => {
@@ -629,7 +630,7 @@ impl Render {
         for render in renders.iter() {
             match render {
                 RenderPart::Line(i) => {
-                    write!(&mut output, "\n")?;
+                    writeln!(&mut output)?;
                     for _n in 0..*i {
                         write!(&mut output, " ")?;
                     }
