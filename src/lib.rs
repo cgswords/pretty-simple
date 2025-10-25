@@ -538,7 +538,10 @@ impl Doc {
                             return false;
                         };
                         remaining -= s_len;
-                        cursor += s_len;
+                        let Some(new_cursor) = cursor.checked_add(s_len) else {
+                            return false;
+                        };
+                        cursor = new_cursor;
                         docs = tail.clone();
                     }
                     DI::Concat(x, y) => {
@@ -573,7 +576,7 @@ impl Doc {
                 }
                 DI::Text(s) => {
                     out.push(RenderPart::Text(s.to_string()));
-                    cursor += s.len() as i16;
+                    cursor = cursor.saturating_add(s.len() as i16);
                     docs = tail.clone();
                 }
                 DI::Concat(x, y) => {

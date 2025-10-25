@@ -111,3 +111,34 @@ fn stack_stress() {
         let _render = cloned.render(w);
     }
 }
+#[test]
+fn stack_stress_2() {
+    // Build a massive, interspersed group
+    let msg = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Fusce risus lacus, \
+    porttitor id lectus vitae, volutpat imperdiet dolor. Orci varius natoque penatibus et magnis \
+    dis parturient montes, nascetur ridiculus mus. Donec malesuada venenatis est at blandit. Duis \
+    hendrerit, tortor vitae fermentum cursus, orci metus scelerisque mi, id porta metus erat in \
+    ex. Nunc a lacus at ante rutrum pulvinar in non ipsum. Quisque dapibus posuere ante sed \
+    consectetur. Nulla facilisi. In ac leo porttitor, mattis erat ac, pulvinar ex. In elementum \
+    orci at scelerisque egestas. Cras id sapien leo. Nulla velit diam, tincidunt eget lectus sit \
+    amet, varius varius nibh. Nulla facilisi. Fusce sit amet euismod sapien. In luctus congue ex \
+    eget viverra. Nullam vitae felis sollicitudin, maximus nulla vel, consectetur magna. Cras orci \
+    dui, dignissim eget nisi ut, iaculis lacinia orci. Sed eget quam et lacus luctus posuere quis \
+    eu massa. Donec placerat velit justo, a convallis eros feugiat sed. Pellentesque nec feugiat \
+    enim, id sagittis neque. Nulla non lectus sed orci ultrices sagittis ut at dolor. Maecenas \
+    eget ipsum ultricies, auctor tellus ac, vehicula risus. Nulla malesuada aliquet sem quis \
+    aliquam. Maecenas tincidunt sapien mi, a ultrices urna viverra ac. In placerat tellus sit.";
+
+    let mut encoded = vec![];
+    while encoded.len() < 100_000 {
+        for char in msg.chars() {
+            encoded.push(char as u8);
+        }
+    }
+
+    let doc = Doc::text("[").concat(Doc::intersperse(
+        encoded.iter().map(|elem| Doc::text(elem.to_string())),
+        Doc::text(",").concat(Doc::space()),
+    ));
+    let _render = doc.render(100);
+}

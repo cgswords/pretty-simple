@@ -5,7 +5,7 @@ edition = "2021"
 name = "pretty_simple"
 readme = "README.md"
 repository = "https://github.com/cgswords/pretty-simple"
-version = "0.1.1"
+version = "0.1.3"
 license = "Apache-2.0"
 
 [dependencies]
